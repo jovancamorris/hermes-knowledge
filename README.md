@@ -20,6 +20,10 @@ Berikut adalah ringkasan penjelasan dan tujuan dari setiap file dokumentasi yang
 * **Ringkasan**: Panduan praktis untuk memproses dan mengonversi riwayat obrolan mentah dari platform eksternal (seperti ChatGPT atau Claude) menjadi format terstruktur JSONL yang kompatibel dengan RAG. Dokumen ini menyediakan *prompt* AI khusus yang siap pakai untuk mengotomatisasi konversi teks mentah menjadi JSON Lines, serta menjelaskan garis besar integrasi datanya menggunakan skrip Python ke ChromaDB.
 * **Tujuan**: Membantu pengguna memformat ulang data percakapan lama dengan cepat dan otomatis tanpa perlu menulis berkas JSON manual baris demi baris.
 
+### 4. [rekomendasi_database_chat.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/rekomendasi_database_chat.md)
+* **Ringkasan**: Dokumen ini berisi analisis, rekomendasi praktis, dan dasar teori (seperti ACID vs BASE, Teorema CAP, serta arsitektur Tiered Storage) dalam memilih database terbaik (PostgreSQL, MongoDB, SQLite) untuk menyimpan *chat history* berformat JSON/JSONL. Dokumen ini sangat esensial untuk mendesain fondasi penyimpanan operasional yang nantinya akan dihubungkan dengan Vector DB dalam arsitektur RAG.
+* **Tujuan**: Memberikan panduan teknis yang solid bagi pengembang dalam menentukan arsitektur penyimpanan chat yang optimal sesuai skala proyek (dari CLI lokal hingga web app skala produksi).
+
 ---
 
 ## Hubungan Antar Dokumen (Alur Kerja)
@@ -28,11 +32,13 @@ Untuk membangun memori jangka panjang Hermes AI secara maksimal, Anda dapat meng
 
 ```mermaid
 graph TD
-    A["Mulai dari Konseptual:<br/>hermes_rag_architecture.md"] --> B["Siapkan Data Chat Lama:<br/>rag_preparation_guide.md"]
+    A["Mulai dari Konseptual:<br/>hermes_rag_architecture.md"] --> A2["Pilih Arsitektur Database:<br/>rekomendasi_database_chat.md"]
+    A2 --> B["Siapkan Data Chat Lama:<br/>rag_preparation_guide.md"]
     B --> C["Instalasi & Hubungkan ke RAG:<br/>hermes_end_to_end_guide.md"]
     C --> D["Hasil: Hermes AI Orchestrator<br/>dengan Memori Jangka Panjang Aktif"]
 ```
 
 1. **Pahami konsep dasarnya** terlebih dahulu melalui [hermes_rag_architecture.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/hermes_rag_architecture.md).
-2. **Kumpulkan dan bersihkan data chat lama** Anda dengan panduan dari [rag_preparation_guide.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/rag_preparation_guide.md) agar menjadi format JSONL.
-3. **Lakukan instalasi, konfigurasi RAG, dan otomatisasi pipeline** di sistem Anda dengan mengikuti langkah-langkah di [hermes_end_to_end_guide.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/hermes_end_to_end_guide.md).
+2. **Pilih arsitektur database operasional yang sesuai** dengan membaca perbandingan dan teori di [rekomendasi_database_chat.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/rekomendasi_database_chat.md).
+3. **Kumpulkan dan bersihkan data chat lama** Anda dengan panduan dari [rag_preparation_guide.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/rag_preparation_guide.md) agar menjadi format JSONL.
+4. **Lakukan instalasi, konfigurasi RAG, dan otomatisasi pipeline** di sistem Anda dengan mengikuti langkah-langkah di [hermes_end_to_end_guide.md](file:///c:/Users/eksad/OneDrive/Documents/GitHub/hermes-knowledge/hermes_end_to_end_guide.md).
