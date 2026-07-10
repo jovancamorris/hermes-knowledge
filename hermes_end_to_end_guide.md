@@ -253,6 +253,9 @@ Jika Anda punya beberapa profile dan ingin mengekspor chat dari **profile terten
 # Ekspor semua chat dari profile "coder"
 hermes -p coder sessions export coder_chats.jsonl
 
+# Ekspor semua chat dari profile "bussiness-analyst"
+hermes -p bussiness-analyst sessions export bussiness-analyst_chats.jsonl
+
 # Ekspor semua chat dari profile "researcher"
 hermes -p researcher sessions export researcher_chats.jsonl
 
