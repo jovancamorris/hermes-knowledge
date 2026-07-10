@@ -269,6 +269,12 @@ hermes -p personal-asst sessions export personal_chats.jsonl
 # Pindah ke profile "researcher"
 hermes profile use researcher
 
+# Pindah ke profile "bussiness-analyst"
+hermes profile use bussiness-analyst
+
+# Pindah ke profile "coder"
+hermes profile use coder
+
 # Sekarang semua perintah akan menargetkan profile "researcher"
 hermes sessions export researcher_all_chats.jsonl
 ```
@@ -281,6 +287,19 @@ Jika Anda ingin backup total seluruh isi profile (bukan hanya chat, tapi juga ko
 # Ini akan membuat file arsip .tar.gz yang berisi SELURUH isi profile
 hermes profile export coder
 # Output: coder_profile_2026-07-09.tar.gz
+
+# Ini akan membuat file arsip .tar.gz yang berisi SELURUH isi profile
+hermes profile export bussiness-analyst
+# Output: bussiness-analyst_profile_2026-07-09.tar.gz
+
+# Ini akan membuat file arsip .tar.gz yang berisi SELURUH isi profile
+hermes profile export researcher
+# Output: researcher_profile_2026-07-09.tar.gz
+
+# Ini akan membuat file arsip .tar.gz yang berisi SELURUH isi profile
+hermes profile export personal-asst
+# Output: personal-asst_profile_2026-07-09.tar.gz
+
 ```
 
 ---
