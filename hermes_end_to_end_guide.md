@@ -4,6 +4,70 @@ Dokumen ini adalah panduan **step-by-step lengkap** untuk menginstal Hermes Agen
 
 ---
 
+## 🧠 Fondasi Teori: Memahami Konsep di Balik Panduan Ini
+
+Sebelum masuk ke langkah teknis, penting untuk memahami konsep-konsep inti yang mendasari seluruh arsitektur ini.
+
+### Teori 1: Apa itu AI Orchestrator?
+
+**AI Orchestrator** adalah sebuah sistem yang mengkoordinasikan berbagai komponen AI (model bahasa, tools, memori, dan agen) secara terpadu untuk menyelesaikan tugas yang kompleks. Berbeda dengan chatbot biasa yang hanya mengandalkan kemampuan model dasar, AI Orchestrator dapat:
+
+- **Memanggil Tools** (*Function Calling*): Melakukan pencarian web, mengeksekusi kode, mengelola file, dan berinteraksi dengan API eksternal.
+- **Mengelola Memori**: Menyimpan dan mengambil konteks dari percakapan masa lalu secara cerdas.
+- **Multi-Agent Coordination**: Mendelegasikan sub-tugas ke agen AI khusus.
+- **Pipeline Orchestration**: Mengatur alur kerja yang melibatkan banyak langkah berurutan.
+
+Hermes adalah implementasi AI Orchestrator yang dirancang untuk berjalan secara lokal, memberikan privasi penuh sekaligus kemampuan yang setara dengan layanan cloud.
+
+---
+
+### Teori 2: Apa itu RAG (Retrieval-Augmented Generation)?
+
+RAG adalah teknik yang menggabungkan dua kemampuan:
+1. **Retrieval** (Pengambilan): Mengambil informasi yang relevan dari sumber data eksternal berdasarkan konteks pertanyaan.
+2. **Generation** (Pembangkitan): Menggunakan informasi yang diambil tersebut untuk menghasilkan jawaban yang lebih akurat dan kontekstual.
+
+```mermaid
+graph LR
+    Q["❓ Pertanyaan User"] --> E["Embedding\n(Ubah teks → vektor)"]
+    E --> VS["Vector Search\n(Cari informasi mirip)"]
+    VS --> KB[("📚 Knowledgebase")]
+    KB --> RC["Konteks Relevan\nditemukan"]
+    RC --> LLM["🤖 LLM (Hermes)"]
+    Q --> LLM
+    LLM --> A["✅ Jawaban Kontekstual"]
+```
+
+**Mengapa RAG lebih baik dari fine-tuning?**
+
+| Aspek | Fine-Tuning | RAG |
+|---|---|---|  
+| **Biaya** | Sangat mahal (GPU, waktu, data) | Murah (hanya storage + embedding) |
+| **Update Data** | Harus latih ulang model | Cukup tambah file ke folder |
+| **Akurasi Sumber** | Tidak bisa ditunjuk sumbernya | Bisa ditunjuk sumber dokumen aslinya |
+| **Privasi** | Data terekspos ke cloud trainer | Data tetap lokal |
+| **Waktu Setup** | Hari hingga minggu | Menit hingga jam |
+
+> [!TIP]
+> RAG adalah pendekatan yang dipilih Hermes karena memungkinkan Anda menambah "memori" baru kapan saja hanya dengan menambahkan file ke folder knowledgebase — tanpa perlu mengonfigurasi ulang model AI.
+
+---
+
+### Teori 3: Context Window dan Batas Memori LLM
+
+Setiap model bahasa (LLM) memiliki keterbatasan yang disebut **Context Window** — batas maksimum jumlah teks (diukur dalam *token*) yang bisa diproses sekaligus dalam satu percakapan.
+
+| Model | Context Window |
+|---|---|
+| GPT-4o | 128.000 token (~96.000 kata) |
+| Claude 3.5 Sonnet | 200.000 token (~150.000 kata) |
+| Llama 3.1 70B | 128.000 token |
+| Gemma 2 9B | 8.192 token |
+
+Masalahnya: jika percakapan Anda sudah berlangsung berbulan-bulan dengan ribuan pesan, **data tersebut tidak mungkin dimuat semua ke dalam context window**. RAG menyelesaikan masalah ini dengan hanya mengambil **potongan informasi yang paling relevan** (biasanya 5–10 chunk) dari ribuan data yang ada, sehingga LLM hanya perlu memproses bagian kecil yang benar-benar dibutuhkan.
+
+---
+
 ## Daftar Isi
 
 1. [Fase 1: Instalasi Hermes Agent](#fase-1-instalasi-hermes-agent)
@@ -115,6 +179,18 @@ Anda akan masuk ke sesi chat interaktif. Coba ketik pertanyaan sederhana untuk m
 
 Sebelum mengekspor data, penting untuk memahami bagaimana Hermes menyimpan obrolan.
 
+### 💡 Teori: Mengapa SQLite Dipilih sebagai Penyimpanan Internal?
+
+Hermes menggunakan **SQLite** sebagai database internal bukan tanpa alasan. SQLite adalah database relasional berbasis file yang dirancang untuk di-*embed* langsung ke dalam aplikasi:
+
+- **Serverless & Zero-Config**: Tidak memerlukan proses server terpisah. Database hidup sebagai satu file (`state.db`) yang bisa langsung diakses oleh aplikasi Hermes.
+- **Atomic Write (ACID)**: Setiap operasi tulis bersifat *atomic* — artinya jika aplikasi crash di tengah penulisan, data tidak akan korup. Ini krusial untuk menjaga integritas riwayat chat.
+- **Cross-Platform**: File `state.db` yang sama bisa dibuka di Windows, macOS, dan Linux tanpa konversi.
+- **WAL Mode**: Hermes mengaktifkan *Write-Ahead Logging (WAL)* di SQLite, memungkinkan operasi baca dan tulis berlangsung secara bersamaan tanpa saling menghalangi.
+
+> [!NOTE]
+> Ini berbeda dengan MongoDB atau PostgreSQL yang memerlukan daemon server yang berjalan di latar belakang. Pilihan SQLite membuat Hermes bisa berjalan ringan di laptop maupun Raspberry Pi sekalipun.
+
 ### Struktur Penyimpanan Internal Hermes
 
 ```
@@ -148,6 +224,35 @@ Sebelum mengekspor data, penting untuk memahami bagaimana Hermes menyimpan obrol
 ## Fase 4: Ekspor Riwayat Chat ke JSONL
 
 Ini adalah langkah kunci: mengambil semua obrolan dari database internal Hermes dan mengekspornya menjadi file JSONL yang terstruktur.
+
+### 💡 Teori: Mengapa Format JSONL (JSON Lines)?
+
+Format **JSONL** (*JSON Lines*) adalah varian dari JSON di mana setiap baris merupakan satu objek JSON yang berdiri sendiri dan valid. Ini berbeda dari JSON biasa yang membungkus semua data dalam satu array besar.
+
+```
+# JSON biasa (seluruh array harus dimuat ke memori dulu)
+[
+  {"role": "user", "content": "Halo"},
+  {"role": "assistant", "content": "Halo juga!"}
+]
+
+# JSONL (setiap baris independen — bisa dibaca streaming)
+{"role": "user", "content": "Halo"}
+{"role": "assistant", "content": "Halo juga!"}
+```
+
+**Keunggulan JSONL untuk Chat History:**
+
+| Keunggulan | Penjelasan |
+|---|---|
+| **Streaming** | Bisa dibaca baris per baris tanpa memuat seluruh file ke RAM |
+| **Append-Only** | Pesan baru cukup ditambahkan di baris akhir, tidak perlu parsing ulang seluruh file |
+| **Parallelizable** | Pipeline chunking bisa memproses file secara paralel baris per baris |
+| **Fault Tolerant** | Jika satu baris korup, baris lain tetap valid (berbeda dengan JSON array) |
+| **Kompatibilitas** | Format standar yang didukung LangChain, LlamaIndex, HuggingFace Datasets, dll. |
+
+> [!TIP]
+> JSONL adalah format yang direkomendasikan oleh komunitas AI/ML untuk menyimpan dataset percakapan. OpenAI sendiri menggunakan format JSONL untuk fine-tuning dataset.
 
 ### 4.0: Di Mana Menjalankan Perintah Ekspor?
 
@@ -451,6 +556,65 @@ cp ~/Documents/panduan_deployment.md ~/.hermes/knowledgebase/documents/
 
 Ini adalah langkah paling penting: menghubungkan folder knowledgebase Anda ke mesin RAG Hermes.
 
+### 💡 Teori: Proses di Balik RAG — Dari File ke Jawaban
+
+Ketika Anda mengaktifkan RAG di Hermes, ada empat tahap yang terjadi secara otomatis di balik layar:
+
+#### Tahap 1: Chunking (Pemotongan Teks)
+
+File-file di folder knowledgebase dipotong menjadi blok-blok teks yang lebih kecil, disebut **chunk**. Ini diperlukan karena tidak mungkin memasukkan seluruh isi knowledgebase ke dalam satu prompt sekaligus.
+
+```
+File chat_history.jsonl (misalnya 5MB, 2000 pesan)
+           │
+           ▼
+   [Chunking Process]
+           │
+           ▼
+  Chunk 1: "Sesi abc123 - Topik PostgreSQL setup"
+  Chunk 2: "Sesi abc123 - Lanjutan PostgreSQL indexing"
+  Chunk 3: "Sesi def456 - Topik Docker Compose"
+  ... (ratusan atau ribuan chunk)
+```
+
+**Strategi chunking yang umum:**
+- **Fixed-size**: Potong setiap N karakter/token (sederhana, cepat)
+- **Semantic/Paragraph**: Potong berdasarkan paragraf atau makna (lebih cerdas)
+- **Session-aware**: Untuk chat history, satu *sesi obrolan* diperlakukan sebagai satu unit chunk (strategi yang digunakan Hermes)
+
+#### Tahap 2: Embedding (Mengubah Teks Menjadi Vektor)
+
+Setiap chunk diubah menjadi representasi numerik berdimensi tinggi (vektor) menggunakan **model embedding**. Teks yang memiliki makna serupa akan menghasilkan vektor yang berdekatan secara matematis.
+
+```
+"Cara setup PostgreSQL di Windows"  →  [0.12, -0.45, 0.88, ..., 0.33]  (1536 dimensi)
+"Install PostgreSQL pada Windows 11"→  [0.11, -0.44, 0.87, ..., 0.31]  (sangat mirip!)
+"Cara memasak nasi goreng"          →  [-0.72, 0.19, -0.56, ..., 0.88] (sangat berbeda)
+```
+
+**Model embedding yang didukung Hermes:**
+
+| Opsi | Konfigurasi | Kualitas | Privasi | Biaya |
+|---|---|---|---|---|
+| `local` | `embedding_model: local` | Baik | ✅ Penuh | Gratis |
+| `ollama` | `embedding_model: ollama` | Sangat Baik | ✅ Penuh | Gratis |
+| `openai` | `embedding_model: openai` | Terbaik | ⚠️ Cloud | Berbayar |
+
+#### Tahap 3: Indexing ke Vector Database
+
+Vektor-vektor hasil embedding disimpan ke dalam **Vector Database** (seperti ChromaDB atau Qdrant). Vector DB dioptimalkan untuk satu operasi kunci: mencari vektor yang paling *mirip* dari kumpulan jutaan vektor dengan sangat cepat menggunakan algoritma **HNSW** (*Hierarchical Navigable Small World*).
+
+#### Tahap 4: Retrieval (Saat Anda Bertanya)
+
+Setiap kali Anda mengetik pertanyaan ke Hermes:
+1. Pertanyaan Anda di-embed menjadi vektor query.
+2. Vector DB mencari N chunk yang vektornya paling dekat dengan vektor query (**cosine similarity search**).
+3. Teks dari chunk-chunk tersebut diambil dan disisipkan ke dalam system prompt Hermes sebagai "konteks memori".
+4. Hermes menjawab berdasarkan pertanyaan Anda + konteks yang ditemukan.
+
+> [!IMPORTANT]
+> Parameter `max_context_chunks: 8` di `config.yaml` mengontrol berapa banyak chunk yang diambil per query. Nilai lebih tinggi = lebih banyak konteks tapi context window lebih cepat penuh. Nilai 5–10 adalah sweet spot untuk kebanyakan kasus penggunaan.
+
 ### Step 1: Buka File Konfigurasi
 
 ```bash
@@ -502,6 +666,40 @@ Saat pertama kali dijalankan setelah konfigurasi RAG, Hermes akan melakukan **in
 ## Fase 7: Mengaktifkan Memory Provider (Opsional - Level Lanjut)
 
 Selain RAG berbasis file, Hermes juga mendukung **memory provider eksternal** untuk memori yang lebih cerdas dan semantik.
+
+### 💡 Teori: Hierarki Memori dalam Sistem AI
+
+Dalam desain sistem AI modern, memori tidak diperlakukan sebagai satu monolith, melainkan dipisahkan menjadi beberapa lapisan berdasarkan fungsi dan persistensinya:
+
+```mermaid
+graph TD
+    subgraph "Lapisan 1: Working Memory (Sesi Aktif)"
+        WM["Context Window LLM\n(Percakapan saat ini, hilang setelah sesi)"]  
+    end
+    subgraph "Lapisan 2: Episodic Memory (Memori Jangka Menengah)"
+        EM["MEMORY.md & USER.md\n(Fakta penting yang di-inject ke setiap sesi)"]
+    end
+    subgraph "Lapisan 3: Semantic Memory (Memori Jangka Panjang)"
+        SM["RAG Knowledgebase\n(Seluruh riwayat chat + dokumen, diambil saat relevan)"]
+    end
+    subgraph "Lapisan 4: Procedural Memory (Kebiasaan & Skill)"
+        PM["Hermes Skills\n(Cara melakukan tugas tertentu yang dipelajari)"]
+    end
+    WM -->|"Dirangkum → disimpan"| EM
+    EM -->|"Detil lengkap → diindeks"| SM
+    SM -->|"Pola berulang → diabstraksi"| PM
+```
+
+**Penjelasan setiap lapisan:**
+
+| Lapisan | Analogi Manusia | Teknologi di Hermes | Persistensi |
+|---|---|---|---|
+| Working Memory | Ingatan dalam percakapan langsung | Context Window LLM | Hilang saat sesi berakhir |
+| Episodic Memory | "Saya ingat pertemuan kemarin" | `MEMORY.md` + `USER.md` | Persisten, diambil tiap sesi |
+| Semantic Memory | "Saya tahu cara memasak" | RAG Knowledgebase | Persisten, diambil saat relevan |
+| Procedural Memory | Kebiasaan & kemampuan motorik | Hermes Skills & Automations | Permanen |
+
+Memory Provider eksternal (Mem0, Honcho, Hindsight) bertugas **mengotomatisasi manajemen lapisan 2 dan 3** — secara cerdas memutuskan informasi mana yang layak disimpan ke memori jangka panjang dan mana yang boleh dilupakan.
 
 ### Step 1: Setup Memory Provider
 
@@ -647,7 +845,29 @@ Hermes akan menggunakan tool `cron_manage` internal untuk membuat jadwal ini.
 
 ## Ringkasan Arsitektur
 
-Berikut adalah gambaran besar alur data dari nol sampai RAG aktif:
+Berikut adalah gambaran besar alur data dari nol sampai RAG aktif.
+
+### 💡 Teori: Mengapa Arsitektur Ini Penting — Prinsip "Separation of Concerns"
+
+Arsitektur Hermes RAG dirancang berdasarkan prinsip **Separation of Concerns (SoC)** — setiap komponen memiliki tanggung jawab yang jelas dan terisolasi:
+
+| Komponen | Tanggung Jawab Tunggal |
+|---|---|
+| `state.db` (SQLite) | Menyimpan data mentah chat dengan aman & cepat |
+| `chat_history.jsonl` | Format portabel untuk pertukaran & pemrosesan data |
+| `knowledgebase/` folder | Repositori terpusat semua sumber pengetahuan |
+| Vector Database | Pencarian semantik berdimensi tinggi |
+| LLM (model AI) | Pembangkitan respons berdasarkan konteks |
+
+Dengan memisahkan komponen ini, Anda bisa mengganti salah satu bagian (misalnya ganti vector DB dari ChromaDB ke Qdrant) tanpa memengaruhi bagian lain. Inilah yang disebut **loosely coupled architecture**.
+
+### 💡 Teori: Data Flow — Append-Only Log sebagai Sumber Kebenaran
+
+Seluruh sistem ini dibangun di atas konsep **append-only log**: data chat yang sudah tersimpan tidak pernah diubah, hanya ditambahkan. Ini adalah pola yang digunakan oleh sistem-sistem berskala besar (Apache Kafka, event sourcing pattern) karena:
+
+- **Audit Trail**: Selalu ada rekaman lengkap apa yang terjadi.
+- **Idempotency**: Menjalankan pipeline embedding berkali-kali menghasilkan hasil yang sama.
+- **Disaster Recovery**: Jika vector DB rusak, cukup rebuild dari file JSONL.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
